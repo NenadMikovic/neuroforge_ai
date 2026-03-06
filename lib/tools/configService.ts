@@ -13,7 +13,7 @@ import type {
 class ToolConfigService {
   private configCache: AdminToolConfig | null = null;
   private cacheExpiry: number = 0;
-  private cacheTtl: number = 60000; // 1 minute
+  private cacheTtl: number = 0; // Disabled - always fetch fresh
 
   /**
    * Get admin configuration
@@ -25,8 +25,8 @@ class ToolConfigService {
     }
 
     try {
-      // Get from database
-      const stored = await (prisma as any).toolConfiguration?.findFirst();
+      // Get from database - no optional chaining
+      const stored = await (prisma as any).toolConfiguration.findFirst();
 
       if (!stored) {
         // Create default config
@@ -71,10 +71,10 @@ class ToolConfigService {
       };
 
       // Save to database
-      const existing = await (prisma as any).toolConfiguration?.findFirst();
+      const existing = await (prisma as any).toolConfiguration.findFirst();
 
       if (existing) {
-        await (prisma as any).toolConfiguration?.update({
+        await (prisma as any).toolConfiguration.update({
           where: { id: existing.id },
           data: {
             globalEnabled: updated.globalEnabled,
@@ -84,7 +84,7 @@ class ToolConfigService {
           },
         });
       } else {
-        await (prisma as any).toolConfiguration?.create({
+        await (prisma as any).toolConfiguration.create({
           data: {
             globalEnabled: updated.globalEnabled,
             toolSettings: JSON.stringify(updated.tools),
@@ -344,7 +344,7 @@ class ToolConfigService {
     const defaultConfig = this.getDefaultConfig();
 
     try {
-      await (prisma as any).toolConfiguration?.create({
+      await (prisma as any).toolConfiguration.create({
         data: {
           globalEnabled: defaultConfig.globalEnabled,
           toolSettings: JSON.stringify(defaultConfig.tools),

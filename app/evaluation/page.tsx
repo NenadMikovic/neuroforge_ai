@@ -64,10 +64,10 @@ export default function EvaluationDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading metrics...</p>
+          <p className="text-gray-400">Loading metrics...</p>
         </div>
       </div>
     );
@@ -75,10 +75,10 @@ export default function EvaluationDashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="max-w-md w-full text-center">
           <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-white mb-2">
+          <h2 className="text-xl font-bold text-slate-100 mb-2">
             Failed to Load Metrics
           </h2>
           <p className="text-gray-400 mb-6">{error}</p>
@@ -94,7 +94,7 @@ export default function EvaluationDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -104,12 +104,34 @@ export default function EvaluationDashboard() {
           >
             ← Back to Home
           </Link>
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Evaluation Dashboard
-          </h1>
-          <p className="text-gray-400">
-            System metrics and performance analytics
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Evaluation Dashboard</h1>
+              <p className="text-gray-400">
+                System metrics and performance analytics
+              </p>
+            </div>
+            <button
+              onClick={loadMetrics}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
+            >
+              <svg
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Time Range Selector */}
@@ -121,7 +143,7 @@ export default function EvaluationDashboard() {
               className={`px-4 py-2 rounded-lg font-medium transition ${
                 days === d
                   ? "bg-blue-600 text-white"
-                  : "bg-slate-700 text-gray-300 hover:bg-slate-600"
+                  : "bg-slate-900 border border-slate-700 text-gray-300 hover:bg-slate-800"
               }`}
             >
               Last {d} Days
@@ -134,57 +156,53 @@ export default function EvaluationDashboard() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {/* Total Tokens */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Total Tokens</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold">
                   {metrics.totalTokens.toLocaleString()}
                 </p>
               </div>
 
               {/* Average Latency */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Avg Latency</p>
-                <p className="text-3xl font-bold text-white">
-                  {metrics.averageLatency}ms
-                </p>
+                <p className="text-3xl font-bold">{metrics.averageLatency}ms</p>
               </div>
 
               {/* Error Rate */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Error Rate</p>
-                <p className="text-3xl font-bold text-white">
-                  {metrics.errorRate}%
-                </p>
+                <p className="text-3xl font-bold">{metrics.errorRate}%</p>
               </div>
 
               {/* Retrieval Hit Rate */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Retrieval Hit Rate</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold">
                   {metrics.retrievalHitRate}%
                 </p>
               </div>
 
               {/* Total Requests */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Total Requests</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold">
                   {metrics.totalRequests.toLocaleString()}
                 </p>
               </div>
 
               {/* Avg Tokens/Request */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Avg Tokens/Request</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold">
                   {metrics.averageTokensPerRequest}
                 </p>
               </div>
 
               {/* Conversations */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
                 <p className="text-gray-400 text-sm mb-2">Conversations</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-3xl font-bold">
                   {metrics.conversationCount}
                 </p>
               </div>
@@ -193,8 +211,8 @@ export default function EvaluationDashboard() {
             {/* Distribution Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {/* Agent Routing Distribution */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">
                   Agent Routing Distribution
                 </h3>
                 <div className="space-y-3">
@@ -205,7 +223,7 @@ export default function EvaluationDashboard() {
                           <span className="text-gray-300 text-sm">{agent}</span>
                           <span className="text-gray-400 text-sm">{count}</span>
                         </div>
-                        <div className="w-full bg-slate-600/50 rounded-full h-2">
+                        <div className="w-full bg-slate-800 rounded-full h-2">
                           <div
                             className="bg-blue-500 h-2 rounded-full"
                             style={{
@@ -228,8 +246,8 @@ export default function EvaluationDashboard() {
               </div>
 
               {/* Tool Usage Frequency */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">
                   Tool Usage Frequency
                 </h3>
                 <div className="space-y-3">
@@ -240,7 +258,7 @@ export default function EvaluationDashboard() {
                           <span className="text-gray-300 text-sm">{tool}</span>
                           <span className="text-gray-400 text-sm">{count}</span>
                         </div>
-                        <div className="w-full bg-slate-600/50 rounded-full h-2">
+                        <div className="w-full bg-slate-800 rounded-full h-2">
                           <div
                             className="bg-green-500 h-2 rounded-full"
                             style={{
@@ -263,10 +281,8 @@ export default function EvaluationDashboard() {
               </div>
 
               {/* Model Usage Distribution */}
-              <div className="bg-slate-700/50 backdrop-blur border border-slate-600/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  Model Usage
-                </h3>
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Model Usage</h3>
                 <div className="space-y-3">
                   {Object.entries(metrics.modelUsageDistribution).map(
                     ([model, count]) => (
@@ -275,7 +291,7 @@ export default function EvaluationDashboard() {
                           <span className="text-gray-300 text-sm">{model}</span>
                           <span className="text-gray-400 text-sm">{count}</span>
                         </div>
-                        <div className="w-full bg-slate-600/50 rounded-full h-2">
+                        <div className="w-full bg-slate-800 rounded-full h-2">
                           <div
                             className="bg-purple-500 h-2 rounded-full"
                             style={{
@@ -303,10 +319,8 @@ export default function EvaluationDashboard() {
         {/* Error Logs */}
         {errorLogs.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Recent Errors
-            </h2>
-            <div className="bg-slate-700/50 backdrop-blur border border-red-600/30 rounded-lg overflow-hidden">
+            <h2 className="text-2xl font-bold mb-4">Recent Errors</h2>
+            <div className="bg-slate-900/50 border border-slate-700 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-slate-800/50">
                   <tr>
@@ -353,10 +367,8 @@ export default function EvaluationDashboard() {
         {/* Security Incidents */}
         {securityIncidents.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Security Incidents
-            </h2>
-            <div className="bg-slate-700/50 backdrop-blur border border-yellow-600/30 rounded-lg overflow-hidden">
+            <h2 className="text-2xl font-bold mb-4">Security Incidents</h2>
+            <div className="bg-slate-900/50 border border-slate-700 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-slate-800/50">
                   <tr>
