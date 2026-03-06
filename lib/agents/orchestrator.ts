@@ -10,7 +10,11 @@ import { ResearchAgent } from "./researchAgent";
 import { ToolAgent } from "./toolAgent";
 import { CriticAgent } from "./criticAgent";
 import { getChatCompletion } from "@/lib/llm/ollama";
-import { getToolEnabledSystemPrompt } from "@/lib/llm/toolCalling";
+import {
+  getToolEnabledSystemPrompt,
+  detectExplicitToolRequest,
+  executeExplicitTool,
+} from "@/lib/llm/toolCalling";
 import { prisma } from "@/lib/db/service";
 import type {
   AgentType,
@@ -94,6 +98,47 @@ export class AgentOrchestrator {
     const startTime = performance.now();
 
     try {
+      // Explicit tool request should bypass intent routing and execute directly.
+      const explicitTool = detectExplicitToolRequest(query);
+      if (explicitTool.isExplicitRequest && explicitTool.toolName) {
+        const toolOutput = await executeExplicitTool(
+          explicitTool.toolName,
+          explicitTool.extractedCode || query,
+          userId,
+        );
+
+        const toolResponse: AgentResponse = {
+          agentType: "tool",
+          status: "success",
+          output: toolOutput,
+          executionTime: Math.round(performance.now() - startTime),
+          reasoning: `Explicit tool request detected for ${explicitTool.toolName}`,
+        };
+
+        const responses = new Map<AgentType, AgentResponse>();
+        responses.set("tool", toolResponse);
+
+        return {
+          conversationId,
+          originalQuery: query,
+          intent: "explicit-tool-request",
+          selectedAgents: ["tool"],
+          responses,
+          finalOutput: toolOutput,
+          totalExecutionTime: Math.round(performance.now() - startTime),
+          executionPlan: {
+            steps: [
+              {
+                stepId: "step-0",
+                agent: "tool",
+                input: query,
+              },
+            ],
+            estimatedCompletionTime: Math.round(performance.now() - startTime),
+          },
+        };
+      }
+
       // Step 1: Intent Classification (now with conversation context)
       console.log(`[Orchestrator] Processing query: "${query}"`);
       const intent = this.intentClassifier.classifyIntent(

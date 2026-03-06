@@ -89,11 +89,40 @@ export class SQLQueryTool {
       // Execute query using Prisma
       const result = await (prisma as any).$queryRawUnsafe(finalQuery);
 
-      return result;
+      // Convert BigInt to regular numbers for JSON serialization
+      return this.convertBigIntsToNumbers(result);
     } catch (error) {
       // Log but don't expose detailed database errors to user
       console.error("[SQLQueryTool] Query execution error:", error);
       throw new Error("Database query failed. Please check your query syntax.");
     }
+  }
+
+  /**
+   * Convert BigInt values to regular numbers for JSON serialization
+   * SQLite returns COUNT() as BigInt which can't be serialized
+   */
+  private convertBigIntsToNumbers(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    if (typeof obj === "bigint") {
+      return Number(obj);
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.convertBigIntsToNumbers(item));
+    }
+
+    if (typeof obj === "object") {
+      const converted: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        converted[key] = this.convertBigIntsToNumbers(value);
+      }
+      return converted;
+    }
+
+    return obj;
   }
 }

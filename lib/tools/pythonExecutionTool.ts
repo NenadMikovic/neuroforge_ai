@@ -5,6 +5,11 @@
 import { spawn } from "child_process";
 import type { ToolCall, ToolResult, ToolContext } from "./types";
 
+interface PythonRuntimeCandidate {
+  command: string;
+  preArgs?: string[];
+}
+
 export class PythonExecutionTool {
   async execute(toolCall: ToolCall, context: ToolContext): Promise<ToolResult> {
     const startTime = performance.now();
@@ -89,45 +94,86 @@ export class PythonExecutionTool {
       // Create a simple Python sandbox environment
       const pythonScript = this.buildSandboxedScript(code, context);
 
-      const child = spawn("python3", ["-c", pythonScript], {
-        timeout,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      const candidates = this.getPythonRuntimeCandidates();
 
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout?.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr?.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      child.on("error", (error) => {
-        reject(error);
-      });
-
-      child.on("close", (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python execution failed: ${stderr}`));
+      const tryCandidate = (index: number) => {
+        if (index >= candidates.length) {
+          reject(
+            new Error(
+              "No Python runtime found. Install Python and ensure 'python' or 'py' is available in PATH.",
+            ),
+          );
           return;
         }
 
-        try {
-          // Try to parse as JSON if output starts with {
-          if (stdout.trim().startsWith("{") || stdout.trim().startsWith("[")) {
-            resolve(JSON.parse(stdout));
-          } else {
-            // Return as plain string
+        const candidate = candidates[index];
+        const args = [...(candidate.preArgs || []), "-c", pythonScript];
+        const child = spawn(candidate.command, args, {
+          timeout,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+
+        let stdout = "";
+        let stderr = "";
+
+        child.stdout?.on("data", (data) => {
+          stdout += data.toString();
+        });
+
+        child.stderr?.on("data", (data) => {
+          stderr += data.toString();
+        });
+
+        child.on("error", (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") {
+            tryCandidate(index + 1);
+            return;
+          }
+          reject(error);
+        });
+
+        child.on("close", (exitCode) => {
+          if (exitCode !== 0) {
+            reject(new Error(`Python execution failed: ${stderr}`));
+            return;
+          }
+
+          try {
+            // Try to parse as JSON if output starts with {
+            if (
+              stdout.trim().startsWith("{") ||
+              stdout.trim().startsWith("[")
+            ) {
+              resolve(JSON.parse(stdout));
+            } else {
+              // Return as plain string
+              resolve(stdout.trim());
+            }
+          } catch {
             resolve(stdout.trim());
           }
-        } catch {
-          resolve(stdout.trim());
-        }
-      });
+        });
+      };
+
+      tryCandidate(0);
     });
+  }
+
+  private getPythonRuntimeCandidates(): PythonRuntimeCandidate[] {
+    const envPython = process.env.PYTHON_EXECUTABLE;
+    if (envPython && envPython.trim().length > 0) {
+      return [{ command: envPython.trim() }];
+    }
+
+    if (process.platform === "win32") {
+      return [
+        { command: "python" },
+        { command: "py", preArgs: ["-3"] },
+        { command: "python3" },
+      ];
+    }
+
+    return [{ command: "python3" }, { command: "python" }];
   }
 
   private buildSandboxedScript(
@@ -175,10 +221,10 @@ except Exception as e:
     exit(1)
 
 # If code returned a value, capture it
-if '_output.data' in dir():
-    print(json.dumps(_output.data))
+if _output.data is not None:
+  print(json.dumps(_output.data))
 else:
-    print(json.dumps({"output": "Code executed successfully"}))
+  print(json.dumps({"output": "Code executed successfully"}))
 `;
 
     return script;

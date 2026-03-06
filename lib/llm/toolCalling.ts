@@ -220,6 +220,9 @@ export function detectExplicitToolRequest(message: string): {
 
   // Check for Python tool requests
   const pythonPatterns = [
+    /python_exec/i,
+    /use\s+python_exec/i,
+    /use\s+python/i,
     /use\s+the\s+python\s+tool/i,
     /run\s+python/i,
     /execute\s+python/i,
@@ -246,6 +249,9 @@ export function detectExplicitToolRequest(message: string): {
 
   // Check for SQL tool requests
   const sqlPatterns = [
+    /sql_query/i,
+    /use\s+sql_query/i,
+    /use\s+sql/i,
     /use\s+the\s+sql\s+tool/i,
     /run\s+sql/i,
     /execute\s+sql/i,
@@ -282,6 +288,7 @@ export async function executeExplicitTool(
   code: string,
   userId?: string,
 ): Promise<string> {
+  const normalizedInput = normalizeExplicitToolInput(toolName, code);
   const executor = new ToolExecutor({ enableLogging: true });
   const toolCallId = `explicit-${Date.now()}`;
 
@@ -291,8 +298,8 @@ export async function executeExplicitTool(
     id: toolCallId,
     params:
       toolName === "python_exec"
-        ? { code, timeout: 30 }
-        : { query: code, limit: 1000 },
+        ? { code: normalizedInput, timeout: 30 }
+        : { query: normalizedInput, limit: 1000 },
   };
 
   const context = {
@@ -304,7 +311,7 @@ export async function executeExplicitTool(
   try {
     console.log(`[Tool Execution]`);
     console.log(`Tool: ${toolName}`);
-    console.log(`Input: ${code}`);
+    console.log(`Input: ${normalizedInput}`);
 
     const result = await executor.execute(toolCall, context);
 
@@ -313,34 +320,173 @@ export async function executeExplicitTool(
     );
 
     if (result.success) {
-      return `
-**[Tool Execution Result]**
-- **Tool**: ${toolName}
-- **Status**: Success ✓
-- **Execution Time**: ${result.executionTime}ms
-- **Result**: 
-\`\`\`
-${JSON.stringify(result.result, null, 2)}
-\`\`\`
-`;
-    } else {
-      return `
-**[Tool Execution Result]**
-- **Tool**: ${toolName}
-- **Status**: Error ✗
-- **Error**: ${result.error}
-`;
+      return formatExplicitToolResult(toolName, result.result);
     }
+
+    return `I couldn't run ${toolName}: ${result.error || "Unknown tool error"}`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[Tool Execution Error]`, errorMessage);
 
-    return `
-**[Tool Execution Error]**
-- **Tool**: ${toolName}
-- **Error**: ${errorMessage}
-`;
+    return `I couldn't run ${toolName}: ${errorMessage}`;
   }
+}
+
+function formatExplicitToolResult(toolName: string, result: unknown): string {
+  // SQL Query formatting
+  if (toolName === "sql_query") {
+    if (!Array.isArray(result)) {
+      return JSON.stringify(result);
+    }
+
+    if (result.length === 0) {
+      return "No records found.";
+    }
+
+    // Handle COUNT(*) or other aggregate functions
+    if (result.length === 1 && typeof result[0] === "object") {
+      const firstRow = result[0] as Record<string, unknown>;
+      const keys = Object.keys(firstRow);
+
+      // Check if this is an aggregate result (COUNT, SUM, AVG, etc.)
+      if (keys.length === 1) {
+        const key = keys[0];
+        const value = firstRow[key];
+
+        // For COUNT(*), just return the number
+        if (key.toUpperCase() === "COUNT(*)" || key.toUpperCase() === "COUNT") {
+          return String(value);
+        }
+
+        // For other aggregates, return "value (key)"
+        return `${value} (${key})`;
+      }
+    }
+
+    // For SELECT queries, show record count and brief summary
+    const recordCount = result.length;
+    if (recordCount === 1) {
+      // Single record - show key properties
+      const record = result[0] as Record<string, unknown>;
+      const summary = Object.entries(record)
+        .slice(0, 2) // Show first 2 fields
+        .map(([key, value]) => {
+          const displayValue =
+            typeof value === "string" && value.length > 50
+              ? value.substring(0, 50) + "..."
+              : value;
+          return `${key}: ${displayValue}`;
+        })
+        .join(", ");
+      return `1 record: ${summary}`;
+    }
+
+    return `${recordCount} records found.`;
+  }
+
+  // Python exec formatting
+  if (toolName === "python_exec") {
+    if (result === null || result === undefined) {
+      return "Done.";
+    }
+
+    if (typeof result === "string") {
+      return result;
+    }
+
+    if (typeof result === "number" || typeof result === "boolean") {
+      return String(result);
+    }
+
+    if (typeof result === "object" && result && "output" in result) {
+      const output = (result as Record<string, unknown>).output;
+      if (typeof output === "string") {
+        return output;
+      }
+    }
+
+    return JSON.stringify(result, null, 2);
+  }
+
+  // Default formatting
+  if (typeof result === "string") {
+    return result;
+  }
+
+  return JSON.stringify(result, null, 2);
+}
+
+function normalizeExplicitToolInput(
+  toolName: string,
+  rawInput: string,
+): string {
+  const trimmed = rawInput.trim();
+
+  // SQL query normalization
+  if (toolName === "sql_query") {
+    // If it already starts with SELECT or WITH, return as-is
+    const upperTrimmed = trimmed.toUpperCase();
+    if (upperTrimmed.startsWith("SELECT") || upperTrimmed.startsWith("WITH")) {
+      return trimmed;
+    }
+
+    // Handle natural language patterns FIRST (before greedy SELECT extraction)
+    // Pattern: "count all rows in TableName"
+    const countMatch = trimmed.match(/count\s+all\s+rows\s+in\s+(\w+)/i);
+    if (countMatch?.[1]) {
+      return `SELECT COUNT(*) FROM ${countMatch[1]}`;
+    }
+
+    // Pattern: "show all from TableName" or "show me all from TableName"
+    const showAllMatch = trimmed.match(
+      /show(?:\s+me)?\s+all\s+(?:from\s+)?(\w+)/i,
+    );
+    if (showAllMatch?.[1]) {
+      return `SELECT * FROM ${showAllMatch[1]} LIMIT 100`;
+    }
+
+    // Try to extract complete SELECT query from mixed text
+    // Only extract if it looks like valid SQL (contains FROM clause)
+    const selectMatch = trimmed.match(/\b(SELECT\s+[\s\S]*?\bFROM\b[\s\S]+)/i);
+    if (selectMatch?.[1]) {
+      return selectMatch[1].trim();
+    }
+
+    // If nothing matches, return as-is (will likely fail validation)
+    return trimmed;
+  }
+
+  // Python exec normalization
+  if (toolName === "python_exec") {
+    // If this already looks like Python code, use it directly.
+    const looksLikeCode =
+      /(^|\n)\s*(import\s+|from\s+|def\s+|for\s+|while\s+|print\s*\(|_output\.set\s*\(|[a-zA-Z_][a-zA-Z0-9_]*\s*=)/.test(
+        trimmed,
+      ) || trimmed.includes("\n");
+
+    if (looksLikeCode) {
+      return trimmed;
+    }
+
+    // Handle natural-language compute requests like: "Use python_exec to compute sqrt(144)."
+    const sqrtMatch = trimmed.match(/sqrt\s*\(([^)]+)\)/i);
+    if (sqrtMatch?.[1]) {
+      const expr = sqrtMatch[1].trim();
+      return `import math\n_output.set(math.sqrt(${expr}))`;
+    }
+
+    const computeExprMatch = trimmed.match(
+      /(?:compute|calculate|evaluate)\s+([0-9+\-*/().\s]+)\.?$/i,
+    );
+    if (computeExprMatch?.[1]) {
+      const expr = computeExprMatch[1].trim();
+      return `_output.set(${expr})`;
+    }
+
+    return trimmed;
+  }
+
+  return trimmed;
 }
 
 /**
