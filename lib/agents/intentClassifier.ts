@@ -38,17 +38,21 @@ const INTENT_PATTERNS = {
       "information",
       "details",
       "background",
+      "metrics",
+      "monitoring",
+      "observability",
+      "track",
     ],
     patterns: [
       /what is|explain|tell me about|how does|why|research|find|search|investigate|who is|who are|who\s/i,
       /background|information|details|learn about|study|author|document|reference/i,
+      /(what|which).*(metrics|monitoring|observability|track)/i,
     ],
   },
   execution: {
     keywords: [
       "execute",
       "run",
-      "do",
       "perform",
       "create",
       "build",

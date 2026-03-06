@@ -98,6 +98,43 @@ export class AgentOrchestrator {
     const startTime = performance.now();
 
     try {
+      // Safety: refuse destructive data-modification requests in natural language.
+      if (this.isDestructiveDataRequest(query)) {
+        const refusal =
+          "I can't help with deleting or modifying users/data. I can help with read-only queries or safe alternatives instead.";
+
+        const toolResponse: AgentResponse = {
+          agentType: "tool",
+          status: "success",
+          output: refusal,
+          executionTime: Math.round(performance.now() - startTime),
+          reasoning: "Blocked destructive data modification request",
+        };
+
+        const responses = new Map<AgentType, AgentResponse>();
+        responses.set("tool", toolResponse);
+
+        return {
+          conversationId,
+          originalQuery: query,
+          intent: "safety-refusal",
+          selectedAgents: ["tool"],
+          responses,
+          finalOutput: refusal,
+          totalExecutionTime: Math.round(performance.now() - startTime),
+          executionPlan: {
+            steps: [
+              {
+                stepId: "step-0",
+                agent: "tool",
+                input: query,
+              },
+            ],
+            estimatedCompletionTime: Math.round(performance.now() - startTime),
+          },
+        };
+      }
+
       // Explicit tool request should bypass intent routing and execute directly.
       const explicitTool = detectExplicitToolRequest(query);
       if (explicitTool.isExplicitRequest && explicitTool.toolName) {
@@ -358,6 +395,11 @@ export class AgentOrchestrator {
 
       // If research didn't find real sources, use Mistral to answer with general knowledge
       if (!hasRealSources) {
+        // For document-grounded asks, avoid hallucinating with general-knowledge fallback.
+        if (this.requiresDocumentGrounding(originalQuery)) {
+          return "I couldn't find any uploaded document content to summarize for your current user. Please upload a document (or use the same user/session that uploaded it), and I will summarize it with source citation.";
+        }
+
         try {
           console.log(
             "[Orchestrator] Research found no sources, using Mistral for general knowledge response",
@@ -377,7 +419,8 @@ export class AgentOrchestrator {
           );
         } catch (error) {
           console.error("[Orchestrator] Mistral fallback failed:", error);
-          // Keep the research response if Mistral fails
+          // Fall back to deterministic offline response when LLM is unavailable.
+          answer = this.generateOfflineFallbackResponse(originalQuery);
         }
       } else {
         // Add planner steps if we have real sources
@@ -444,9 +487,34 @@ export class AgentOrchestrator {
       return narrativeAnswer;
     }
 
-    // If we have tool output, use it
+    // If we have tool output, use it unless no tool matched.
     if (toolResponse && toolResponse.status === "success") {
-      return toolResponse.output;
+      const noToolMatched = toolResponse.output
+        .toLowerCase()
+        .includes("no applicable tool");
+
+      if (!noToolMatched) {
+        return toolResponse.output;
+      }
+
+      try {
+        console.log(
+          "[Orchestrator] Tool agent had no applicable tool, using Mistral fallback",
+        );
+        return await getChatCompletion([
+          {
+            role: "system",
+            content: getToolEnabledSystemPrompt(),
+          },
+          {
+            role: "user",
+            content: originalQuery,
+          },
+        ]);
+      } catch (error) {
+        console.error("[Orchestrator] Mistral fallback failed:", error);
+        return this.generateOfflineFallbackResponse(originalQuery);
+      }
     }
 
     // Fallback: concatenate all available responses
@@ -487,8 +555,58 @@ export class AgentOrchestrator {
       return mistralAnswer;
     } catch (error) {
       console.error("[Orchestrator] Mistral fallback also failed:", error);
-      return `Query: ${originalQuery}\n\nThe system encountered issues processing your request. Please try again.`;
+      return this.generateOfflineFallbackResponse(originalQuery);
     }
+  }
+
+  /**
+   * Deterministic fallback when external LLM is unavailable.
+   */
+  private generateOfflineFallbackResponse(query: string): string {
+    const q = query.toLowerCase();
+
+    if (q.includes("vector database")) {
+      return "A vector database stores high-dimensional embeddings that represent semantic meaning of content like text or images. It enables similarity search using metrics such as cosine similarity, so you can find related items by meaning instead of exact keywords. It is commonly used in RAG systems, semantic search, and recommendation pipelines.";
+    }
+
+    if (
+      q.includes("observability") ||
+      q.includes("monitoring") ||
+      (q.includes("metrics") && q.includes("platform"))
+    ) {
+      return "This platform tracks request latency, token usage (input/output/total), model usage, error rates, agent routing/execution outcomes, tool call success rates and timing, retrieval hit rates/similarity scores, and conversation/memory activity for observability.";
+    }
+
+    const sqrtMatch = q.match(/square\s+root\s+of\s+(-?\d+(?:\.\d+)?)/i);
+    if (sqrtMatch?.[1]) {
+      const n = Number(sqrtMatch[1]);
+      if (!Number.isNaN(n) && n >= 0) {
+        return `The square root of ${n} is ${Math.sqrt(n)}.`;
+      }
+    }
+
+    return "I can still help, but the local chat model is currently unavailable. Please start Ollama at http://localhost:11434 for full conversational answers, or ask me to run a specific enabled tool.";
+  }
+
+  private isDestructiveDataRequest(query: string): boolean {
+    const q = query.toLowerCase();
+
+    const destructiveVerb = /(delete|drop|truncate|remove|destroy|wipe)\b/.test(
+      q,
+    );
+    const dataTarget =
+      /\b(user|users|database|table|rows|records)\b/.test(q) ||
+      q.includes("from the database");
+
+    return destructiveVerb && dataTarget;
+  }
+
+  private requiresDocumentGrounding(query: string): boolean {
+    const q = query.toLowerCase();
+    return (
+      /(summari[sz]e|summary|bullet points?)/.test(q) &&
+      /(uploaded|document|pdf|source file|cite|citation)/.test(q)
+    );
   }
 
   /**

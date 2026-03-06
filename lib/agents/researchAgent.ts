@@ -66,6 +66,8 @@ export class ResearchAgent extends BaseAgent {
 
     try {
       const [output, executionTime] = await this.measureTimeAsync(async () => {
+        const retrievalThreshold = this.getRetrievalThreshold(payload.input);
+
         // Generate embedding for the query
         console.log(
           `[ResearchAgent] Generating embedding for query: "${payload.input}"`,
@@ -77,12 +79,12 @@ export class ResearchAgent extends BaseAgent {
 
         // Retrieve relevant documents
         console.log(
-          `[ResearchAgent] Retrieving documents for userId: ${payload.userId}, topK: 5, threshold: 0.3`,
+          `[ResearchAgent] Retrieving documents for userId: ${payload.userId}, topK: 5, threshold: ${retrievalThreshold}`,
         );
         const documents = await this.retriever!.retrieve({
           embedding,
           topK: 5,
-          threshold: 0.3,
+          threshold: retrievalThreshold,
           userId: payload.userId,
         } as any);
         console.log(`[ResearchAgent] Retrieved ${documents.length} documents`);
@@ -140,6 +142,23 @@ export class ResearchAgent extends BaseAgent {
       await this.logExecution(payload.conversationId, payload.input, response);
       return response;
     }
+  }
+
+  /**
+   * Use lower thresholds for document-grounded summarization/citation queries,
+   * because semantic similarity can be lower for broad prompts.
+   */
+  private getRetrievalThreshold(query: string): number {
+    const q = query.toLowerCase();
+    const needsDocumentSummary =
+      /(summari[sz]e|summary|bullet points?)/.test(q) &&
+      /(uploaded|document|pdf|source|cite|citation)/.test(q);
+
+    if (needsDocumentSummary) {
+      return 0.12;
+    }
+
+    return 0.3;
   }
 
   /**

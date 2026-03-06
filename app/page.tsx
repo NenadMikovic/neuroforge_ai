@@ -353,6 +353,91 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Local Setup Guide */}
+      <section className="border-t border-slate-900 px-6 py-20">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8 text-white">
+            How To Use This Local AI System
+          </h2>
+
+          <p className="text-lg text-slate-400 mb-8 leading-relaxed">
+            If you are reviewing this project after cloning it, this section
+            tells you exactly what must be running and how to use the platform
+            end to end.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-10">
+            <div className="border border-slate-800 rounded bg-slate-900/30 p-6">
+              <h3 className="text-lg font-semibold text-slate-200 mb-4">
+                Required Programs
+              </h3>
+              <div className="space-y-2 text-slate-400 text-sm ml-4">
+                <p>• Node.js 18+ (recommended: Node 20 LTS)</p>
+                <p>
+                  • npm (ships with Node) for dependency install and scripts
+                </p>
+                <p>• Ollama running locally on http://localhost:11434</p>
+                <p>• Mistral model pulled in Ollama (for chat generation)</p>
+                <p>• Python 3.x in PATH (for python_exec tool)</p>
+                <p>• SQLite/Prisma runtime (auto-managed by project scripts)</p>
+              </div>
+            </div>
+
+            <div className="border border-slate-800 rounded bg-slate-900/30 p-6">
+              <h3 className="text-lg font-semibold text-slate-200 mb-4">
+                Services And Ports
+              </h3>
+              <div className="space-y-2 text-slate-400 text-sm ml-4">
+                <p>• Web app: Next.js dev server on http://localhost:3000</p>
+                <p>• Ollama API: http://localhost:11434 (must be reachable)</p>
+                <p>• Database: local SQLite file used via Prisma ORM</p>
+                <p>
+                  • If Ollama is down, tool-only flows still run, but general
+                  chat fallback quality is reduced
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-slate-800 rounded bg-slate-900/30 p-6 mb-10">
+            <h3 className="text-lg font-semibold text-slate-200 mb-4">
+              Quick Start (After Clone)
+            </h3>
+            <div className="space-y-2 text-slate-400 text-sm ml-4 font-mono">
+              <p>1. npm install</p>
+              <p>2. npx prisma db push</p>
+              <p>3. ollama serve</p>
+              <p>4. ollama pull mistral</p>
+              <p>5. npm run dev</p>
+            </div>
+          </div>
+
+          <div className="border border-slate-800 rounded bg-slate-900/30 p-6">
+            <h3 className="text-lg font-semibold text-slate-200 mb-4">
+              What To Test First
+            </h3>
+            <div className="space-y-3 text-slate-400 text-sm">
+              <p>
+                • Upload a PDF from the Documents flow, then ask chat to
+                summarize it with citations.
+              </p>
+              <p>
+                • Open Tool Management Center (/tools) and toggle tools on/off
+                to verify enforcement.
+              </p>
+              <p>
+                • Test explicit tools: sql_query, python_exec, file_search, and
+                system_metrics.
+              </p>
+              <p>
+                • Open Admin Dashboard (/admin/dashboard) to inspect latency,
+                tokens, routing, tool metrics, and retrieval stats.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Technical Capabilities */}
       <section className="border-t border-slate-900 px-6 py-20 bg-slate-950/50">
         <div className="max-w-4xl mx-auto">

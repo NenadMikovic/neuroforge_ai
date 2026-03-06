@@ -281,6 +281,8 @@ export function detectExplicitToolRequest(message: string): {
     /search\s+for\s+files/i,
     /find\s+files/i,
     /search\s+files/i,
+    /(search|find|list).*(file|files|pdf|pdfs)/i,
+    /(uploads?|directory).*(file|files|pdf|pdfs)/i,
   ];
 
   for (const pattern of fileSearchPatterns) {
@@ -372,7 +374,35 @@ export async function executeExplicitTool(
       return formatExplicitToolResult(toolName, result.result);
     }
 
-    return `I couldn't run ${toolName}: ${result.error || "Unknown tool error"}`;
+    const toolError = result.error || "Unknown tool error";
+
+    // Keep explicit control-state errors visible (do not mask disabled tools).
+    if (toolError.toLowerCase().includes("disabled")) {
+      return `I couldn't run ${toolName}: ${toolError}`;
+    }
+
+    // Try a general LLM fallback when tool execution fails for non-policy reasons.
+    try {
+      const fallback = await getChatCompletion([
+        {
+          role: "system",
+          content:
+            "You are a concise assistant. The requested tool execution failed. Answer the user request directly in plain language.",
+        },
+        {
+          role: "user",
+          content: code,
+        },
+      ]);
+
+      if (fallback?.trim()) {
+        return fallback.trim();
+      }
+    } catch {
+      // Ignore and return tool error below.
+    }
+
+    return `I couldn't run ${toolName}: ${toolError}`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[Tool Execution Error]`, errorMessage);
@@ -550,7 +580,7 @@ function normalizeExplicitToolInput(
   if (toolName === "file_search") {
     // Extract directory if specified: "in /uploads", "from /uploads", etc.
     const dirMatch = trimmed.match(
-      /(?:in|from|within|at)\s+\/?(\w+)(?:\b|\/)/i,
+      /(?:in|from|within|at)\s+(?:the\s+)?\/?(\w+)(?:\b|\/)/i,
     );
     const dir = dirMatch?.[1] ? dirMatch[1] : "";
 
@@ -568,6 +598,11 @@ function normalizeExplicitToolInput(
     if (extMatch?.[0]) {
       const pattern = `*${extMatch[0]}`;
       return dir ? `./${dir}/${pattern}` : pattern;
+    }
+
+    // Handle phrases like "PDF files" without dot extension.
+    if (/\bpdfs?\b/i.test(trimmed)) {
+      return dir ? `./${dir}/*.pdf` : "./uploads/*.pdf";
     }
 
     // Look for patterns with word.ext (like "document.pdf")
@@ -636,6 +671,24 @@ function normalizeExplicitToolInput(
     if (sqrtMatch?.[1]) {
       const expr = sqrtMatch[1].trim();
       return `import math\n_output.set(math.sqrt(${expr}))`;
+    }
+
+    // Handle phrases like "calculate the square root of 256"
+    const squareRootPhraseMatch = trimmed.match(
+      /square\s+root\s+of\s+(-?\d+(?:\.\d+)?)/i,
+    );
+    if (squareRootPhraseMatch?.[1]) {
+      const value = squareRootPhraseMatch[1].trim();
+      return `import math\n_output.set(math.sqrt(${value}))`;
+    }
+
+    // Handle phrases like "what is the square root 256"
+    const squareRootCompactMatch = trimmed.match(
+      /square\s+root\s+(-?\d+(?:\.\d+)?)/i,
+    );
+    if (squareRootCompactMatch?.[1]) {
+      const value = squareRootCompactMatch[1].trim();
+      return `import math\n_output.set(math.sqrt(${value}))`;
     }
 
     const computeExprMatch = trimmed.match(
