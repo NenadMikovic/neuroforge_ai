@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../.generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  conversations Conversation[]
+  documents     Document[]
+  rateLimitKey  String?  @unique
+
+  @@index([email])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   @default("New Conversation")
+  messages  Message[]
+  agentTasks AgentTask[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Message {
+  id               String   @id @default(cuid())
+  conversationId   String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role             String   // "user" or "assistant"
+  content          String
+  tokenUsage       Int?     // tokens used in API call
+  latency          Int?     // response time in ms
+  sources          MessageSource[]
+  createdAt        DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model Document {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String   // original filename
+  type             String   // pdf, docx, txt
+  originalPath     String   // path where uploaded file is stored
+  metadata         String   // JSON stringified metadata
+  chunks           DocumentChunk[]
+  retrievalMetrics RetrievalMetric[]
+  messageSources   MessageSource[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model DocumentChunk {
+  id               String   @id @default(cuid())
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex       Int      // position in document
+  content          String   // the actual text chunk
+  embedding        Bytes    // vector embedded as binary
+  retrievalMetrics RetrievalMetric[]
+  messageSources   MessageSource[]
+  createdAt        DateTime @default(now())
+
+  @@index([documentId])
+}
+
+model MessageSource {
+  id               String   @id @default(cuid())
+  messageId        String
+  message          Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkId          String
+  chunk            DocumentChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  rankPosition     Int      // rank of this chunk in retrieval results
+  similarity       Float    // cosine similarity score
+  createdAt        DateTime @default(now())
+
+  @@index([messageId])
+  @@index([documentId])
+  @@index([chunkId])
+}
+
+model RetrievalMetric {
+  id               String   @id @default(cuid())
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkId          String
+  chunk            DocumentChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  userId           String   // who performed the retrieval
+  hitCount         Int      @default(1) // how many times retrieved
+  lastRetrieved    DateTime @default(now()) @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@index([documentId])
+  @@index([chunkId])
+}
+
+model AgentTask {
+  id               String   @id @default(cuid())
+  conversationId   String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parentTaskId     String?  // for hierarchical task breakdown
+  originalQuery    String   // the original user query
+  taskDescription  String   // the subtask description
+  taskType         String   // "planning", "research", "execution", "evaluation"
+  status           String   @default("pending") // pending, in-progress, completed, failed
+  result           String?  // the task result
+  metadata         String?  // JSON stringified additional data
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([parentTaskId])
+  @@index([status])
+}
+
+model AgentLog {
+  id               String   @id @default(cuid())
+  conversationId   String   // tracking id for correlation, not a foreign key
+  agentType        String   // "planner", "research", "tool", "critic"
+  agentName        String   // specific agent instance
+  input            String   // JSON stringified input payload
+  output           String?  // JSON stringified output payload
+  status           String   @default("pending") // pending, success, error
+  errorMessage     String?
+  executionTime    Int      // milliseconds
+  tokenUsage       Int?     // tokens used if applicable
+  metadata         String?  // JSON stringified additional context
+  createdAt        DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([agentType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AgentMetrics {
+  id               String   @id @default(cuid())
+  agentType        String   @unique // "planner", "research", "tool", "critic"
+  totalExecutions  Int      @default(0) // total times agent was called
+  successCount     Int      @default(0) // successful executions
+  errorCount       Int      @default(0) // failed executions
+  totalExecutionTime Int    @default(0) // cumulative time in ms
+  averageExecutionTime Float @default(0) // calculated average
+  averageTokenUsage Int     @default(0) // average tokens per call
+  routingFrequency Int      @default(0) // how many times routed to this agent
+  lastExecution    DateTime @default(now()) @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@index([agentType])
+}
+
+model AgentRoutingLog {
+  id               String   @id @default(cuid())
+  conversationId   String   // tracking id for correlation, not a foreign key
+  query            String   // the user input
+  detectedIntent   String   // the detected intent
+  selectedAgent    String   // which agent was selected
+  confidence       Float    // confidence score of routing decision
+  reasoning        String?  // why this agent was selected
+  createdAt        DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([detectedIntent])
+  @@index([selectedAgent])
+  @@index([createdAt])
+}
+
+model ToolExecutionLog {
+  id               String   @id @default(cuid())
+  conversationId   String   // correlation id
+  userId           String   // which user ran the tool
+  toolName         String   // tool name (sql_query, python_exec, etc)
+  toolCallId       String   // unique id of this tool call
+  paramsHash       String   // SHA hash of params for tracking
+  executionTime    Int      // milliseconds
+  resultHash       String   // SHA hash of result
+  success          Boolean  @default(false)
+  errorMessage     String?  // error if failed
+  resultSize       Int      // bytes of result
+  cacheHit         Boolean  @default(false)
+  metadata         String?  // JSON additional data
+  createdAt        DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([toolName])
+  @@index([success])
+  @@index([createdAt])
+}
+
+model ToolConfiguration {
+  id               String   @id @default(cuid())
+  globalEnabled    Boolean  @default(true)
+  // Store as JSON for flexibility
+  toolSettings     String   // JSON stringified tool-specific settings
+  loggingConfig    String   // JSON stringified logging config
+  securityConfig   String   // JSON stringified security config
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([globalEnabled])
+}
+model ConversationMemory {
+  id               String   @id @default(cuid())
+  userId           String   // which user this memory belongs to
+  conversationId   String   // conversation being summarized
+  summary          String   // summarized text of conversation
+  embedding        Bytes    // vector embedding of summary for similarity search
+  tokenCount       Int      // tokens in original conversation
+  messageCount     Int      // number of messages summarized
+  keyTopics        String   // JSON stringified array of key topics extracted
+  metadata         String?  // JSON additional metadata
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model MetricsRecord {
+  id               String   @id @default(cuid())
+  userId           String   // which user this metric belongs to
+  conversationId   String   // which conversation
+  tokenCount       Int      // tokens used in this request
+  latency          Int      // response time in ms
+  agentType        String?  // which agent was used
+  toolUsed         String?  // which tool was used (sql_query, etc)
+  modelUsed        String   // which model name (mistral, etc)
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  errorOccurred    Boolean  @default(false)
+  errorType        String?  // type of error if occurred
+  retrievalHit     Boolean  @default(false) // whether retrieval returned relevant docs
+  metadata         String?  // JSON additional metrics
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([agentType])
+  @@index([toolUsed])
+  @@index([createdAt])
+}
+
+model SecurityAuditLog {
+  id               String   @id @default(cuid())
+  userId           String   // which user made the request
+  conversationId   String?  // which conversation (if applicable)
+  threatType       String   // "prompt_injection", "output_validation_failed", "unauthorized_access", etc
+  severity         String   // "low", "medium", "high", "critical"
+  description      String   // detailed description of threat
+  suspicious_input String?  // the suspicious input (if safe to log)
+  action_taken     String   // what we did (blocked, logged, sanitized, etc)
+  is_blocked       Boolean  @default(false) // whether request was blocked
+  metadata         String?  // JSON additional security info
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([threatType])
+  @@index([severity])
+  @@index([is_blocked])
+  @@index([createdAt])
+}
