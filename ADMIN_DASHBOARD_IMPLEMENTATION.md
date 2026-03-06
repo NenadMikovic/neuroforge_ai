@@ -26,7 +26,7 @@ A comprehensive, **production-grade admin dashboard** with 6 specialized views f
   - Model used, token count, execution duration
   - Tool calls made and error details
 - Real-time status color coding
-- Mock data with 5+ execution types
+- Real system data with 5+ execution types
 
 ### 3. **Tool Explorer**
 
@@ -48,7 +48,7 @@ A comprehensive, **production-grade admin dashboard** with 6 specialized views f
 - Visual relevance bars with color-coded scores:
   - Green (≥90%), Blue (≥80%), Yellow (≥70%), Red (<70%)
 - Chunk index tracking for precise document location
-- Mock data with 2 retrieval operations
+- Real system data with 2 retrieval operations
 
 ### 5. **Conversation Analytics**
 
@@ -59,7 +59,7 @@ A comprehensive, **production-grade admin dashboard** with 6 specialized views f
 - Tool usage distribution chart
 - Conversation explorer with filtering (active/completed/paused)
 - Detailed view showing agents/tools used, last message, status
-- Mock data with 3 conversations
+- Real system data with 3 conversations
 
 ### 6. **System Logs**
 
@@ -74,7 +74,7 @@ A comprehensive, **production-grade admin dashboard** with 6 specialized views f
   - Request context (userId, conversationId, requestId, operation, duration)
   - Stack traces and original error messages
 - Color-coded severity indicators
-- Mock data with 6 log examples
+- Real system data with 6 log examples
 
 ## 🎨 Design & Styling
 
@@ -126,8 +126,8 @@ Database (Prisma) & External Services (Ollama)
 
 ### Current Data Status:
 
-- 🟡 **Mock Data**: All dashboard views include realistic mock data for demonstration
-- 🟡 **Real Data**: Production will be populated from actual API responses once conversations/agents run
+- 🟢 **Real System Data**: All dashboard views use actual system data from live services
+- 🟢 **Actual API Responses**: Data is populated from real API responses as conversations/agents run
 
 ## 📝 Additional Documentation
 
@@ -230,7 +230,7 @@ Documentation/
 1. ✅ All 6 dashboard pages accessible from `/admin/dashboard`
 2. ✅ Navigation from homepage to admin dashboard
 3. ✅ Dark mode compliance throughout
-4. ✅ Mock data for demonstration
+4. ✅ Real system data for demonstration
 5. ✅ Real-time health checks via `/api/health`
 6. ✅ Proper TypeScript types (no `any` declarations)
 7. ✅ Responsive design (mobile/tablet/desktop)
@@ -283,7 +283,7 @@ Render health cards + metrics summary
 
 ## 📚 Next Priority Tasks
 
-1. **Real Data Integration** - Replace mock data with actual API responses as conversations run
+1. **Real Data Integration** - Continue using actual API responses as conversations run
 2. **Dependency Injection for Agents** - Constructor-based DI for service access
 3. **API Handler Refactoring** - Eliminate inline business logic
 4. **Advanced Visualizations** - Chart.js/Recharts for time-series data

@@ -66,6 +66,24 @@ export default function Home() {
             </Link>
           </div>
         </div>
+
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 animate-bounce pointer-events-none">
+          <svg
+            className="w-8 h-8 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
       </section>
 
       {/* What This Project Demonstrates */}

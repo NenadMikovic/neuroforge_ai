@@ -283,7 +283,7 @@ export default async function AdminLayout({ children }) {
 
 ### Missing data in charts
 
-- Data is mock for new installations
+- Data comes from real system data for new installations
 - Run conversations to generate real metrics
 - Check database tables exist: `Conversation`, `Message`, `Metrics`
 

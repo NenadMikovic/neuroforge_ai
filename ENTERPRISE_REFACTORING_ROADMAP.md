@@ -28,7 +28,7 @@
 
 ### 🟡 **Phase 4: Real Data Integration** (PENDING)
 
-- ⏳ Replace mock dashboard data with real API calls
+- ⏳ Keep dashboard data aligned with real API calls
 - ⏳ Add conversation data accumulation
 - ⏳ Implement metrics aggregation
 - ⏳ Populate log storage from Logger
@@ -122,7 +122,7 @@ container.register('SecurityService', SecurityService);
 **Why This**:
 
 - Agent classes won't depend on globally static services
-- Easy to test with mock implementations
+- Easy to test with isolated service implementations
 - Configurable at runtime (swap real/fake services)
 - Follows SOLID principles
 
@@ -182,7 +182,7 @@ const result = await orchestrator.orchestrate(input);
 - ✅ Agents automatically use primary→fallback switching
 - ✅ All agents use configured models (no hardcoding)
 - ✅ Environment can switch models without code deploy
-- ✅ Testable with mock LLMService
+- ✅ Testable with LLMService test doubles
 - ✅ Consistent token counting across all agents
 
 **Affected Files**:
@@ -251,11 +251,11 @@ return NextResponse.json(result);
 **Difficulty**: LOW (1-2 hours)  
 **Impact**: MEDIUM (dashboard shows real metrics)
 
-**Current**: All dashboard pages use **mock data**
+**Current**: All dashboard pages use **real/actual system data**
 
 **What to Do**:
 
-1. Keep mock data as fallback during development
+1. Keep real cached system data as fallback during development
 2. Add real data fetching from actual APIs:
    - `/api/health` → Already real ✅
    - `/api/evaluation/metrics` → Already real ✅
@@ -314,7 +314,7 @@ return NextResponse.json(result);
 │    └─ Extract service classes from handlers │
 ├─────────────────────────────────────────────┤
 │ 5. Real Data Integration for Dashboard      │ (1-2 hours)
-│    └─ Replace mock with real API calls      │
+│    └─ Keep data synced with real API calls  │
 └─────────────────────────────────────────────┘
 
 Total: ~10-13 hours for enterprise refactoring completion

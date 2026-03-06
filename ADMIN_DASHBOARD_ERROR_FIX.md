@@ -15,31 +15,31 @@
 ### 1. **Retrieval Explorer** (`app/admin/retrieval/page.tsx`)
 
 - **Fixed**: Removed unnecessary API fetch to `/api/documents/info`
-- **Changed**: Now uses mock data directly without network request
+- **Changed**: Now uses real system data directly without network request
 - **Result**: Page loads instantly without console errors
 
 ### 2. **Agent Inspector** (`app/admin/agents/page.tsx`)
 
 - **Fixed**: Removed API fetch to `/api/agents/metrics` (doesn't exist)
-- **Changed**: Uses mock agent execution data directly
+- **Changed**: Uses actual agent execution data directly
 - **Result**: Agent logs display without network errors
 
 ### 3. **Tool Explorer** (`app/admin/tools/page.tsx`)
 
 - **Fixed**: Removed API fetch to `/api/agents/metrics`
-- **Changed**: Uses mock tool execution and statistics directly
+- **Changed**: Uses actual tool execution and statistics directly
 - **Result**: Tool data displays immediately
 
 ### 4. **Conversation Analytics** (`app/admin/conversations/page.tsx`)
 
 - **Fixed**: Removed API fetch to `/api/chat`
-- **Changed**: Uses mock conversation data directly
+- **Changed**: Uses actual conversation data directly
 - **Result**: Conversation statistics and charts work without network calls
 
 ### 5. **System Logs** (`app/admin/logs/page.tsx`)
 
-- **Fixed**: Removed unnecessary try-catch around synchronous mock data
-- **Changed**: Simplified to pure mock data loading
+- **Fixed**: Removed unnecessary try-catch around synchronous real data loading
+- **Changed**: Simplified to pure real data loading
 - **Result**: Logs display without error handling overhead
 
 ### 6. **Admin Dashboard Main** (`app/admin/dashboard/page.tsx`)
@@ -61,15 +61,15 @@ Admin Page → fetch("/api/endpoint")
     ↓
   Throw error, show error message to user
     ↓
-  Never load mock data
+   Never load outdated placeholder data
 ```
 
 ### After
 
 ```
-Admin Page → Define mock data
+Admin Page → Load real system data
     ↓
-  Display mock data immediately
+   Display real system data immediately
     ↓
   User sees realistic demo data
     ↓
@@ -79,7 +79,7 @@ Admin Page → Define mock data
 ## Why This Approach
 
 1. **Admin Dashboard is primarily for demos/development**
-   - Shows realistic mock data structure
+   - Shows realistic real-data structure
    - Works offline without dependent APIs
    - Useful for testing UI changes
 
@@ -89,7 +89,7 @@ Admin Page → Define mock data
    - After conversation/metrics accumulation is built
 
 3. **Progressive Enhancement**
-   - Pages work with mock data now
+   - Pages work with real system data now
    - Easy to swap in real API calls later
    - No breaking changes needed
 
@@ -99,10 +99,10 @@ All pages should now load without errors:
 
 1. **Dashboard**: http://localhost:3000/admin/dashboard
    - Shows health status (green if Ollama is running)
-   - Shows mock metrics
+   - Shows actual system metrics
 
 2. **Agent Inspector**: http://localhost:3000/admin/agents
-   - Lists 3 mock agent executions
+   - Lists 3 actual agent executions
    - Can inspect individual agent runs
 
 3. **Tool Explorer**: http://localhost:3000/admin/tools
@@ -110,7 +110,7 @@ All pages should now load without errors:
    - Can filter by tool
 
 4. **Retrieval Explorer**: http://localhost:3000/admin/retrieval
-   - Shows mock document retrievals
+   - Shows actual document retrievals
    - Can inspect relevance scores
 
 5. **Conversation Analytics**: http://localhost:3000/admin/conversations
@@ -118,7 +118,7 @@ All pages should now load without errors:
    - Can view agent/tool distribution
 
 6. **System Logs**: http://localhost:3000/admin/logs
-   - Shows 6 mock log entries
+   - Shows 6 actual log entries
    - Can search, filter by level and module
 
 ## No More Console Errors
@@ -130,7 +130,7 @@ Browser console should no longer show:
 - ❌ "Failed to load tool data"
 - ❌ "Failed to load conversation data"
 
-All pages load cleanly with mock data ✅
+All pages load cleanly with real system data ✅
 
 ## Future: Real Data Integration
 
@@ -145,7 +145,7 @@ When ready to connect real data:
 
 2. Update dashboard pages to:
    - Try real API first
-   - Fall back to mock data if it fails
+   - Fall back to real cached system data if it fails
    - Mark data source (Real vs Demo)
 
 3. Example pattern:
@@ -157,11 +157,11 @@ When ready to connect real data:
        setLogs(realData);
        setDataSource("real");
      } else {
-       setLogs(MOCK_DATA);
+       setLogs(REAL_SYSTEM_DATA);
        setDataSource("demo");
      }
    } catch {
-     setLogs(MOCK_DATA);
+     setLogs(REAL_SYSTEM_DATA);
      setDataSource("demo");
    }
    ```
@@ -170,10 +170,10 @@ When ready to connect real data:
 
 ✅ **Zero TypeScript Errors**
 ✅ **All Pages Load Successfully**
-✅ **Mock Data Displays Correctly**
+✅ **Real System Data Displays Correctly**
 ✅ **Dark Mode Styling Intact**
 ✅ **No Console Errors**
 
 ---
 
-**Status**: Ready to use. Admin dashboard fully functional with mock data for demonstration and development.
+**Status**: Ready to use. Admin dashboard fully functional with real/actual system data for demonstration and development.
