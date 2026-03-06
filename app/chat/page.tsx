@@ -10,11 +10,19 @@ import {
 } from "@/lib/services/chatService";
 import { showErrorToast, showSuccessToast } from "@/lib/utils/toast";
 
+function generateTitleFromFirstMessage(message: string): string {
+  const cleaned = message.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "New Conversation";
+  const title = cleaned.split(" ").slice(0, 7).join(" ");
+  return title.length > 60 ? `${title.slice(0, 57)}...` : title;
+}
+
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const initializedRef = useRef(false);
 
   // Get active conversation
@@ -41,14 +49,25 @@ export default function ChatPage() {
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === activeConversationId
-            ? {
-                ...conv,
-                messages,
-                lastMessage: messages[messages.length - 1]?.content.substring(
-                  0,
-                  50,
-                ),
-              }
+            ? (() => {
+                const firstUserMessage = messages.find(
+                  (m) => m.role === "user",
+                );
+                const nextTitle =
+                  conv.title === "New Conversation" && firstUserMessage
+                    ? generateTitleFromFirstMessage(firstUserMessage.content)
+                    : conv.title;
+
+                return {
+                  ...conv,
+                  title: nextTitle,
+                  messages,
+                  lastMessage: messages[messages.length - 1]?.content.substring(
+                    0,
+                    50,
+                  ),
+                };
+              })()
             : conv,
         ),
       );
@@ -58,23 +77,63 @@ export default function ChatPage() {
 
   // Delete conversation
   const handleDeleteConversation = useCallback(
-    (id: string) => {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeConversationId === id) {
-        setActiveConversationId(null);
+    async (id: string) => {
+      try {
+        await chatService.deleteConversation(id);
+      } catch (error) {
+        showErrorToast("Failed to delete conversation");
+        return;
       }
+
+      setConversations((prev) => {
+        const remaining = prev.filter((c) => c.id !== id);
+        if (activeConversationId === id) {
+          setActiveConversationId(remaining[0]?.id || null);
+        }
+        return remaining;
+      });
       showSuccessToast("Conversation deleted");
     },
     [activeConversationId],
   );
 
-  // Start with a default conversation if none exists
+  // Load persistent conversations from DB on first render
   React.useEffect(() => {
-    if (conversations.length === 0 && !initializedRef.current) {
-      initializedRef.current = true;
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const loadConversations = async () => {
+      try {
+        const loaded = await chatService.loadConversations();
+        setConversations(loaded);
+        if (loaded.length > 0) {
+          setActiveConversationId(loaded[0].id);
+        }
+      } catch (error) {
+        showErrorToast("Failed to load conversations");
+      } finally {
+        setHasLoaded(true);
+      }
+    };
+
+    loadConversations();
+  }, []);
+
+  // Start with a default conversation if no persistent history exists
+  React.useEffect(() => {
+    if (
+      hasLoaded &&
+      conversations.length === 0 &&
+      activeConversationId === null
+    ) {
       handleNewConversation();
     }
-  }, [conversations.length, handleNewConversation]);
+  }, [
+    hasLoaded,
+    conversations.length,
+    activeConversationId,
+    handleNewConversation,
+  ]);
 
   return (
     <div className="min-h-screen bg-[#0a0e17] text-slate-100">

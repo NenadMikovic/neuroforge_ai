@@ -70,9 +70,11 @@ export async function getOrCreateUser(userId: string, email?: string) {
 export async function createConversation(
   userId: string,
   title: string = "New Conversation",
+  conversationId?: string,
 ) {
   return prisma.conversation.create({
     data: {
+      ...(conversationId ? { id: conversationId } : {}),
       userId,
       title,
     },

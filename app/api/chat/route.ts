@@ -6,6 +6,9 @@ import {
   createConversation,
   getConversation,
   getConversationMessages,
+  getUserConversations,
+  deleteConversation as deleteConversationRecord,
+  updateConversationTitle,
   addMessage,
   addMessageSources,
 } from "@/lib/db/service";
@@ -36,6 +39,19 @@ interface ChatRequest {
     content: string;
     createdAt?: string;
   }>;
+}
+
+function generateConversationTitle(input: string): string {
+  const cleaned = input
+    .replace(/\s+/g, " ")
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+
+  if (!cleaned) return "New Conversation";
+
+  const words = cleaned.split(" ").slice(0, 7);
+  const title = words.join(" ");
+  return title.length > 60 ? `${title.slice(0, 57)}...` : title;
 }
 
 /**
@@ -110,8 +126,12 @@ export async function POST(request: NextRequest) {
       if (existingConv) {
         convId = conversationId;
       } else {
-        // Conversation doesn't exist, create a new one
-        const conversation = await createConversation(userId);
+        // Preserve client-provided id so client and DB stay in sync.
+        const conversation = await createConversation(
+          userId,
+          "New Conversation",
+          conversationId,
+        );
         convId = conversation.id;
       }
     } else {
@@ -178,6 +198,22 @@ export async function POST(request: NextRequest) {
         const latency = Date.now() - startTime;
         const inputTokens = TokenCounter.countTokens(message);
         const outputTokens = TokenCounter.countTokens(result.finalOutput);
+
+        // Persist user message in agent mode (was previously missing).
+        await addMessage({
+          conversationId: convId,
+          role: "user",
+          content: message,
+        });
+
+        // Auto-title on first user message.
+        const existingMessages = await getConversationMessages(convId, 2);
+        if (existingMessages.length <= 1) {
+          await updateConversationTitle(
+            convId,
+            generateConversationTitle(message),
+          );
+        }
 
         // Save assistant message from orchestrator
         const savedMessage = await addMessage({
@@ -430,6 +466,15 @@ CRITICAL INSTRUCTIONS:
             content: message,
           });
 
+          // Auto-title on first user message.
+          const existingMessages = await getConversationMessages(convId, 2);
+          if (existingMessages.length <= 1) {
+            await updateConversationTitle(
+              convId,
+              generateConversationTitle(message),
+            );
+          }
+
           const savedMessage = await addMessage({
             conversationId: convId,
             role: "assistant",
@@ -584,11 +629,54 @@ export async function GET(request: NextRequest) {
     // Get or create user
     await getOrCreateUser(userId);
 
-    // In a real app, you'd fetch from DB. For now, return empty list.
-    // This will be implemented in the frontend service.
-    return NextResponse.json({
-      conversations: [],
-    });
+    const conversations = await getUserConversations(userId);
+    const hydrated = await Promise.all(
+      conversations.map(async (conv: any) => {
+        const messages = await getConversationMessages(conv.id, 200);
+        return {
+          id: conv.id,
+          title: conv.title,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt,
+          lastMessage: conv.messages?.[0]?.content || "",
+          messages,
+        };
+      }),
+    );
+
+    return NextResponse.json({ conversations: hydrated });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/chat - Delete a conversation for a user
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const conversationId = request.nextUrl.searchParams.get("conversationId");
+    const userId = request.nextUrl.searchParams.get("userId");
+
+    if (!conversationId || !userId) {
+      return NextResponse.json(
+        { error: "Missing required parameters: conversationId and userId" },
+        { status: 400 },
+      );
+    }
+
+    const conversation = await getConversation(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 },
+      );
+    }
+
+    await deleteConversationRecord(conversationId);
+    return NextResponse.json({ success: true });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";

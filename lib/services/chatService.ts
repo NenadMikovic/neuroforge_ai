@@ -23,6 +23,7 @@ export interface Conversation {
   messages: Message[];
   lastMessage?: string;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 class ChatService {
@@ -31,6 +32,53 @@ class ChatService {
 
   constructor(apiUrl: string = "/api/chat") {
     this.apiUrl = apiUrl;
+  }
+
+  /**
+   * Load conversations for current user from API
+   */
+  async loadConversations(): Promise<Conversation[]> {
+    const userId = this.getOrCreateUserId();
+    const response = await fetch(`${this.apiUrl}?userId=${userId}`);
+
+    if (!response.ok) {
+      throw new Error("Failed to load conversations");
+    }
+
+    const data = await response.json();
+    const conversations = (data.conversations || []) as any[];
+
+    return conversations.map((conv) => ({
+      id: conv.id,
+      title: conv.title || "New Conversation",
+      messages: (conv.messages || []).map((m: any) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        latency: m.latency ?? undefined,
+        tokens: m.tokenUsage ?? undefined,
+        createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
+      })),
+      lastMessage: conv.lastMessage || undefined,
+      createdAt: conv.createdAt ? new Date(conv.createdAt) : new Date(),
+      updatedAt: conv.updatedAt ? new Date(conv.updatedAt) : undefined,
+    }));
+  }
+
+  /**
+   * Delete a conversation for current user
+   */
+  async deleteConversation(conversationId: string): Promise<void> {
+    const userId = this.getOrCreateUserId();
+    const response = await fetch(
+      `${this.apiUrl}?conversationId=${conversationId}&userId=${userId}`,
+      { method: "DELETE" },
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to delete conversation");
+    }
   }
 
   /**
