@@ -36,6 +36,7 @@ export default function RetrievalExplorer() {
   const [results, setResults] = useState<RetrievalResult[]>([]);
   const [docStats, setDocStats] = useState<DocumentStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedResult, setSelectedResult] = useState<RetrievalResult | null>(
     null,
   );
@@ -43,97 +44,32 @@ export default function RetrievalExplorer() {
     "recency",
   );
 
-  useEffect(() => {
-    const loadData = async () => {
-      // Mock retrieval results (no real API available in admin context)
-      const mockResults: RetrievalResult[] = [
-        {
-          id: "1",
-          query: "How does machine learning work?",
-          timestamp: new Date(Date.now() - 5000).toISOString(),
-          documentsRetrieved: 3,
-          totalDuration: 234,
-          model: "mistral",
-          documents: [
-            {
-              id: "doc1",
-              title: "ML Fundamentals",
-              relevanceScore: 0.92,
-              excerpt:
-                "Machine learning is a subset of artificial intelligence...",
-              chunkIndex: 0,
-            },
-            {
-              id: "doc2",
-              title: "Neural Networks Overview",
-              relevanceScore: 0.87,
-              excerpt: "Neural networks are computing systems inspired by...",
-              chunkIndex: 2,
-            },
-            {
-              id: "doc3",
-              title: "Deep Learning Guide",
-              relevanceScore: 0.78,
-              excerpt: "Deep learning involves multiple layers of...",
-              chunkIndex: 1,
-            },
-          ],
-        },
-        {
-          id: "2",
-          query: "What are embeddings?",
-          timestamp: new Date(Date.now() - 30000).toISOString(),
-          documentsRetrieved: 2,
-          totalDuration: 189,
-          model: "mistral",
-          documents: [
-            {
-              id: "doc4",
-              title: "Vector Embeddings Explained",
-              relevanceScore: 0.95,
-              excerpt: "Embeddings are dense vector representations...",
-              chunkIndex: 0,
-            },
-            {
-              id: "doc5",
-              title: "NLP Techniques",
-              relevanceScore: 0.81,
-              excerpt: "Word embeddings map words to vectors...",
-              chunkIndex: 3,
-            },
-          ],
-        },
-      ];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-      setResults(mockResults);
+      const response = await fetch("/api/admin/retrieval?limit=150");
+      if (!response.ok) {
+        throw new Error("Failed to fetch retrieval data");
+      }
 
-      // Calculate document stats
-      const docMap = new Map<string, DocumentStats>();
-      mockResults.forEach((result) => {
-        result.documents.forEach((doc) => {
-          const existing = docMap.get(doc.id) || {
-            documentId: doc.id,
-            title: doc.title,
-            totalRetrievals: 0,
-            averageRelevance: 0,
-            lastRetrieved: result.timestamp,
-          };
-
-          existing.totalRetrievals++;
-          existing.averageRelevance =
-            (existing.averageRelevance * (existing.totalRetrievals - 1) +
-              doc.relevanceScore) /
-            existing.totalRetrievals;
-          existing.lastRetrieved = result.timestamp;
-
-          docMap.set(doc.id, existing);
-        });
-      });
-
-      setDocStats(Array.from(docMap.values()));
+      const data = await response.json();
+      setResults(data.results || []);
+      setDocStats(data.docStats || []);
+    } catch (err) {
+      console.error("[RetrievalExplorer] Failed to fetch retrieval data:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load retrieval data",
+      );
+      setResults([]);
+      setDocStats([]);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -173,11 +109,42 @@ export default function RetrievalExplorer() {
           >
             ← Back to Dashboard
           </Link>
-          <h1 className="text-4xl font-bold mb-2">Retrieval Explorer</h1>
-          <p className="text-gray-400">
-            Analyze document retrieval performance and relevance
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Retrieval Explorer</h1>
+              <p className="text-gray-400">
+                Analyze document retrieval performance and relevance
+              </p>
+            </div>
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
+            >
+              <svg
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Refresh
+            </button>
+          </div>
         </div>
+
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 rounded-lg p-4 mb-6">
+            <p className="font-semibold">Error loading retrieval data</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12">
@@ -262,12 +229,18 @@ export default function RetrievalExplorer() {
 
                       {/* Top Relevance Bars */}
                       <div className="space-y-1">
-                        {result.documents.slice(0, 3).map((doc) => (
-                          <div key={doc.id} className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500 w-12">
+                        {result.documents.slice(0, 3).map((doc, idx) => (
+                          <div
+                            key={`${result.id}-${doc.id}-${idx}`}
+                            className="flex items-center gap-2"
+                          >
+                            <span
+                              className="text-xs text-gray-500 w-32 truncate"
+                              title={doc.title}
+                            >
                               {doc.title}
                             </span>
-                            <div className="flex-1 h-2 bg-slate-800 rounded overflow-hidden">
+                            <div className="w-40 h-2 bg-slate-800 rounded overflow-hidden">
                               <div
                                 className={`h-full ${
                                   doc.relevanceScore >= 0.9
@@ -308,9 +281,9 @@ export default function RetrievalExplorer() {
                             Retrieved Documents
                           </p>
                           <div className="space-y-3">
-                            {result.documents.map((doc) => (
+                            {result.documents.map((doc, idx) => (
                               <div
-                                key={doc.id}
+                                key={`${result.id}-doc-${doc.id}-${idx}`}
                                 className="bg-slate-900/50 border border-slate-700 p-3 rounded"
                               >
                                 <div className="flex justify-between items-start mb-2">
