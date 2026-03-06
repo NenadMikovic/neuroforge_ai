@@ -79,8 +79,8 @@ export default function AgentDashboard() {
     };
 
     fetchMetrics();
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchMetrics, 10000);
+    // Refresh every 60 seconds (1 minute)
+    const interval = setInterval(fetchMetrics, 60000);
     return () => clearInterval(interval);
   }, [timeRange]);
 
@@ -221,7 +221,7 @@ export default function AgentDashboard() {
                         </span>
                       </td>
                       <td className="text-center py-3 px-4">
-                        {metric.averageExecutionTime}ms
+                        {metric.averageExecutionTime.toFixed(2)}ms
                       </td>
                       <td className="text-center py-3 px-4">
                         <span
@@ -365,7 +365,7 @@ export default function AgentDashboard() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-400 text-sm">
-          <p>Dashboard updates automatically every 10 seconds</p>
+          <p>Dashboard updates automatically every minute</p>
           <p>Last updated: {new Date().toLocaleTimeString()}</p>
         </div>
       </div>

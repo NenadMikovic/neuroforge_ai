@@ -42,16 +42,33 @@ export default function AgentInspector() {
             timestamp: log.createdAt,
             agentType: log.agentType,
             status:
-              log.status === "error" ? "failure" : log.status || "success",
+              log.status === "error"
+                ? "failure"
+                : log.status === "success"
+                  ? "success"
+                  : log.status === "timeout"
+                    ? "timeout"
+                    : "partial",
             prompt:
               typeof log.input === "string"
                 ? log.input
                 : JSON.stringify(log.input),
             response: log.output ? JSON.stringify(log.output) : "",
             duration: log.executionTime || 0,
-            model: "mistral",
+            model:
+              log.modelUsed ||
+              log.metadata?.modelUsed ||
+              log.metadata?.model ||
+              log.metadata?.llm?.model ||
+              "mistral",
             tokensUsed: log.tokenUsage || 0,
-            toolsCalled: [],
+            toolsCalled: Array.isArray(log.toolsCalled)
+              ? log.toolsCalled
+              : Array.isArray(log.metadata?.toolsCalled)
+                ? log.metadata.toolsCalled
+                : Array.isArray(log.metadata?.toolCalls)
+                  ? log.metadata.toolCalls
+                  : [],
             error: log.errorMessage || undefined,
           }));
           setLogs(transformedLogs);

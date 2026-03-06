@@ -99,7 +99,7 @@ class ChatService {
           conversationId,
           message,
           userId,
-          useAgents: false, // Disable agent orchestration - use direct LLM chat
+          useAgents: true, // Enable agent orchestration so agent executions are logged
           conversationHistory: conversationHistory || [],
         }),
         signal,

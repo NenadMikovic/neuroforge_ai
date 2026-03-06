@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/service";
+import { TokenCounter } from "@/lib/services/tokenCounter";
 
 export async function GET(request: NextRequest) {
   try {
@@ -179,14 +180,91 @@ async function getAgentLogs(agentType: string | null) {
       take: 100,
     });
 
-    // Parse JSON fields
-    const parsed = logs.map((log) => ({
-      ...log,
-      input:
-        typeof log.input === "string" ? log.input : JSON.stringify(log.input),
-      output: log.output ? JSON.parse(log.output) : null,
-      metadata: log.metadata ? JSON.parse(log.metadata) : null,
-    }));
+    const conversationIds = Array.from(
+      new Set(logs.map((log) => log.conversationId).filter(Boolean)),
+    );
+
+    const [metricsByConversation, toolsByConversation] = await Promise.all([
+      conversationIds.length > 0
+        ? (prisma as any).metricsRecord
+            ?.findMany({
+              where: {
+                conversationId: { in: conversationIds },
+              },
+              orderBy: { createdAt: "desc" },
+            })
+            .catch(() => [])
+        : Promise.resolve([]),
+      conversationIds.length > 0
+        ? (prisma as any).toolExecutionLog
+            ?.findMany({
+              where: {
+                conversationId: { in: conversationIds },
+              },
+              orderBy: { createdAt: "desc" },
+            })
+            .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    const modelByConversation = new Map<string, string>();
+    for (const metric of metricsByConversation || []) {
+      if (metric.conversationId && metric.modelUsed) {
+        if (!modelByConversation.has(metric.conversationId)) {
+          modelByConversation.set(metric.conversationId, metric.modelUsed);
+        }
+      }
+    }
+
+    const toolsMap = new Map<string, string[]>();
+    for (const toolLog of toolsByConversation || []) {
+      if (!toolLog.conversationId || !toolLog.toolName) {
+        continue;
+      }
+      const existing = toolsMap.get(toolLog.conversationId) || [];
+      if (!existing.includes(toolLog.toolName)) {
+        existing.push(toolLog.toolName);
+      }
+      toolsMap.set(toolLog.conversationId, existing);
+    }
+
+    // Parse JSON fields safely; malformed JSON should not drop the whole response.
+    const safeParse = (value: string | null) => {
+      if (!value) {
+        return null;
+      }
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value;
+      }
+    };
+
+    const parsed = logs.map((log) => {
+      const inputText =
+        typeof log.input === "string" ? log.input : JSON.stringify(log.input);
+      const parsedOutput = safeParse(log.output);
+      const outputText =
+        typeof parsedOutput === "string"
+          ? parsedOutput
+          : JSON.stringify(parsedOutput ?? "");
+      const estimatedTokenUsage =
+        TokenCounter.countTokens(inputText) +
+        TokenCounter.countTokens(outputText);
+
+      return {
+        ...log,
+        input: inputText,
+        output: parsedOutput,
+        tokenUsage:
+          typeof log.tokenUsage === "number" && log.tokenUsage > 0
+            ? log.tokenUsage
+            : estimatedTokenUsage,
+        metadata: safeParse(log.metadata),
+        modelUsed: modelByConversation.get(log.conversationId) || null,
+        toolsCalled: toolsMap.get(log.conversationId) || [],
+      };
+    });
 
     return NextResponse.json({
       logs: parsed,

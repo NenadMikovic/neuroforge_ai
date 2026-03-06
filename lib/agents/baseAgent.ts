@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/db/service";
+import { TokenCounter } from "@/lib/services/tokenCounter";
 import type {
   AgentPayload,
   AgentResponse,
@@ -33,6 +34,12 @@ export abstract class BaseAgent {
     input: string,
     output: AgentResponse,
   ): Promise<void> {
+    const resolvedTokenUsage =
+      output.tokenUsage && output.tokenUsage > 0
+        ? output.tokenUsage
+        : TokenCounter.countTokens(input) +
+          TokenCounter.countTokens(output.output);
+
     // Fire and forget - don't block on database operations
     prisma.agentLog
       .create({
@@ -45,7 +52,7 @@ export abstract class BaseAgent {
           status: output.status === "success" ? "success" : "error",
           errorMessage: output.error,
           executionTime: output.executionTime,
-          tokenUsage: output.tokenUsage,
+          tokenUsage: resolvedTokenUsage,
           metadata: output.reasoning
             ? JSON.stringify({ reasoning: output.reasoning })
             : undefined,
@@ -56,7 +63,7 @@ export abstract class BaseAgent {
       });
 
     // Update agent metrics (non-blocking)
-    this.updateMetrics(output).catch((error) => {
+    this.updateMetrics(output, resolvedTokenUsage).catch((error) => {
       console.error(`[${this.agentName}] Failed to update metrics:`, error);
     });
   }
@@ -64,7 +71,10 @@ export abstract class BaseAgent {
   /**
    * Update performance metrics for this agent
    */
-  protected async updateMetrics(response: AgentResponse): Promise<void> {
+  protected async updateMetrics(
+    response: AgentResponse,
+    tokenUsage: number,
+  ): Promise<void> {
     try {
       const metrics = await prisma.agentMetrics.upsert({
         where: { agentType: this.agentType },
@@ -75,7 +85,7 @@ export abstract class BaseAgent {
           errorCount: response.status === "error" ? 1 : 0,
           totalExecutionTime: response.executionTime,
           averageExecutionTime: response.executionTime,
-          averageTokenUsage: response.tokenUsage || 0,
+          averageTokenUsage: tokenUsage,
           routingFrequency: 1,
         },
         update: {
@@ -88,7 +98,7 @@ export abstract class BaseAgent {
           },
           totalExecutionTime: { increment: response.executionTime },
           averageTokenUsage: {
-            increment: response.tokenUsage || 0,
+            increment: tokenUsage,
           },
         },
       });
