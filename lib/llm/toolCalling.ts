@@ -273,6 +273,46 @@ export function detectExplicitToolRequest(message: string): {
     }
   }
 
+  // Check for file_search tool requests
+  const fileSearchPatterns = [
+    /file_search/i,
+    /use\s+file_search/i,
+    /use\s+file\s+search/i,
+    /search\s+for\s+files/i,
+    /find\s+files/i,
+    /search\s+files/i,
+  ];
+
+  for (const pattern of fileSearchPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return {
+        toolName: "file_search",
+        extractedCode: message,
+        isExplicitRequest: true,
+      };
+    }
+  }
+
+  // Check for system_metrics tool requests
+  const systemMetricsPatterns = [
+    /system_metrics/i,
+    /use\s+system_metrics/i,
+    /use\s+system\s+metrics/i,
+    /system\s+metrics/i,
+    /get\s+metrics/i,
+    /cpu\s+and\s+memory/i,
+  ];
+
+  for (const pattern of systemMetricsPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return {
+        toolName: "system_metrics",
+        extractedCode: message,
+        isExplicitRequest: true,
+      };
+    }
+  }
+
   return {
     toolName: null,
     extractedCode: null,
@@ -299,7 +339,16 @@ export async function executeExplicitTool(
     params:
       toolName === "python_exec"
         ? { code: normalizedInput, timeout: 30 }
-        : { query: normalizedInput, limit: 1000 },
+        : toolName === "file_search"
+          ? { pattern: normalizedInput, depth: 5, limit: 100 }
+          : toolName === "system_metrics"
+            ? {
+                metrics: normalizedInput
+                  .split(",")
+                  .map((m) => m.trim())
+                  .filter(Boolean),
+              }
+            : { query: normalizedInput, limit: 1000 },
   };
 
   const context = {
@@ -333,6 +382,61 @@ export async function executeExplicitTool(
 }
 
 function formatExplicitToolResult(toolName: string, result: unknown): string {
+  // System metrics formatting
+  if (toolName === "system_metrics") {
+    if (!result || typeof result !== "object") {
+      return "No system metrics available.";
+    }
+
+    const data = result as Record<string, any>;
+    const parts: string[] = [];
+
+    if (data.cpu?.loadAverage?.one !== undefined) {
+      parts.push(`CPU load (1m): ${data.cpu.loadAverage.one}`);
+    }
+
+    if (data.memory?.percentage !== undefined) {
+      parts.push(
+        `Memory: ${data.memory.percentage}% (${data.memory.used}/${data.memory.total})`,
+      );
+    }
+
+    if (data.disk?.path) {
+      parts.push(`Disk path: ${data.disk.path}`);
+    }
+
+    if (data.uptime?.formatted) {
+      parts.push(`Uptime: ${data.uptime.formatted}`);
+    }
+
+    if (parts.length === 0) {
+      return "System metrics collected.";
+    }
+
+    return parts.join(" | ");
+  }
+
+  // File search formatting
+  if (toolName === "file_search") {
+    if (!Array.isArray(result)) {
+      return "No files found.";
+    }
+
+    if (result.length === 0) {
+      return "No files found.";
+    }
+
+    if (result.length === 1) {
+      const file = result[0] as Record<string, unknown>;
+      return `Found 1 file: ${file.name}`;
+    }
+
+    const files = (result as Array<Record<string, unknown>>)
+      .map((f) => f.name)
+      .join(", ");
+    return `Found ${result.length} files: ${files}`;
+  }
+
   // SQL Query formatting
   if (toolName === "sql_query") {
     if (!Array.isArray(result)) {
@@ -421,6 +525,65 @@ function normalizeExplicitToolInput(
   rawInput: string,
 ): string {
   const trimmed = rawInput.trim();
+
+  // System metrics normalization
+  if (toolName === "system_metrics") {
+    const lower = trimmed.toLowerCase();
+    const metrics: string[] = [];
+
+    if (lower.includes("cpu")) metrics.push("cpu");
+    if (lower.includes("memory")) metrics.push("memory");
+    if (lower.includes("disk")) metrics.push("disk");
+    if (lower.includes("network")) metrics.push("network");
+    if (lower.includes("process")) metrics.push("processes");
+    if (lower.includes("uptime")) metrics.push("uptime");
+
+    // Sensible default when user asks generic system metrics
+    if (metrics.length === 0) {
+      metrics.push("cpu", "memory", "uptime");
+    }
+
+    return Array.from(new Set(metrics)).join(",");
+  }
+
+  // File search normalization
+  if (toolName === "file_search") {
+    // Extract directory if specified: "in /uploads", "from /uploads", etc.
+    const dirMatch = trimmed.match(
+      /(?:in|from|within|at)\s+\/?(\w+)(?:\b|\/)/i,
+    );
+    const dir = dirMatch?.[1] ? dirMatch[1] : "";
+
+    // Extract pattern like *.pdf, *.txt, *, etc.
+    // Patterns: "find *.pdf files", "search for *.pdf", "*.pdf in /uploads"
+
+    // First, look for wildcard patterns (*.pdf, *.txt, *)
+    const wildcardMatch = trimmed.match(/(\*\.\w+|\*)/);
+    if (wildcardMatch?.[0]) {
+      return dir ? `./${dir}/${wildcardMatch[0]}` : wildcardMatch[0];
+    }
+
+    // Then look for file extensions (.pdf, .txt, etc.)
+    const extMatch = trimmed.match(/\.(\w+)/);
+    if (extMatch?.[0]) {
+      const pattern = `*${extMatch[0]}`;
+      return dir ? `./${dir}/${pattern}` : pattern;
+    }
+
+    // Look for patterns with word.ext (like "document.pdf")
+    const fileMatch = trimmed.match(/\b(\w+\.\w+)\b/);
+    if (fileMatch?.[0]) {
+      return dir ? `./${dir}/${fileMatch[0]}` : fileMatch[0];
+    }
+
+    // If directory specified but no pattern, search all files in that dir
+    if (dir) {
+      return `./${dir}/*`;
+    }
+
+    // Default to all files in default directory
+    return "./uploads/*";
+  }
 
   // SQL query normalization
   if (toolName === "sql_query") {

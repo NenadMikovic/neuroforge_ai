@@ -253,10 +253,63 @@ export default function ToolManagementDashboard() {
 
         {/* Tool Cards */}
         <div className="space-y-6">
+          {/* Configuration Details */}
+          <div className="bg-slate-900/50 rounded-lg shadow-sm border border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-slate-100 mb-4">
+              System Configuration
+            </h2>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Logging */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-100 mb-3">
+                  Logging
+                </h3>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <p>
+                    <span className="font-medium">Status:</span>{" "}
+                    {config?.logging.enabled ? (
+                      <span className="text-green-400">Enabled</span>
+                    ) : (
+                      <span className="text-red-400">Disabled</span>
+                    )}
+                  </p>
+                  <p>
+                    <span className="font-medium">Level:</span>{" "}
+                    {config?.logging.logLevel}
+                  </p>
+                  <p>
+                    <span className="font-medium">Database:</span>{" "}
+                    {config?.logging.logToDatabase ? "Yes" : "No"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Security */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-100 mb-3">
+                  Security
+                </h3>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <p>
+                    <span className="font-medium">Input Validation:</span>{" "}
+                    {config?.security.enableInputValidation ? "Yes" : "No"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Output Sanitization:</span>{" "}
+                    {config?.security.enableOutputSanitization ? "Yes" : "No"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Audit:</span>{" "}
+                    {config?.security.auditAllCalls ? "All Calls" : "Disabled"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
           <h2 className="text-xl font-semibold text-slate-100">
             Available Tools
           </h2>
-
           {config &&
             Object.entries(config.tools).map(([toolName, toolConfig]) => {
               const toolStat = stats[toolName];
@@ -432,61 +485,6 @@ export default function ToolManagementDashboard() {
                 </div>
               );
             })}
-        </div>
-
-        {/* Configuration Details */}
-        <div className="mt-8 bg-slate-900/50 rounded-lg shadow-sm border border-slate-700 p-6">
-          <h2 className="text-lg font-semibold text-slate-100 mb-4">
-            System Configuration
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Logging */}
-            <div>
-              <h3 className="text-sm font-medium text-slate-100 mb-3">
-                Logging
-              </h3>
-              <div className="space-y-2 text-sm text-gray-400">
-                <p>
-                  <span className="font-medium">Status:</span>{" "}
-                  {config?.logging.enabled ? (
-                    <span className="text-green-400">Enabled</span>
-                  ) : (
-                    <span className="text-red-400">Disabled</span>
-                  )}
-                </p>
-                <p>
-                  <span className="font-medium">Level:</span>{" "}
-                  {config?.logging.logLevel}
-                </p>
-                <p>
-                  <span className="font-medium">Database:</span>{" "}
-                  {config?.logging.logToDatabase ? "Yes" : "No"}
-                </p>
-              </div>
-            </div>
-
-            {/* Security */}
-            <div>
-              <h3 className="text-sm font-medium text-slate-100 mb-3">
-                Security
-              </h3>
-              <div className="space-y-2 text-sm text-gray-400">
-                <p>
-                  <span className="font-medium">Input Validation:</span>{" "}
-                  {config?.security.enableInputValidation ? "Yes" : "No"}
-                </p>
-                <p>
-                  <span className="font-medium">Output Sanitization:</span>{" "}
-                  {config?.security.enableOutputSanitization ? "Yes" : "No"}
-                </p>
-                <p>
-                  <span className="font-medium">Audit:</span>{" "}
-                  {config?.security.auditAllCalls ? "All Calls" : "Disabled"}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
