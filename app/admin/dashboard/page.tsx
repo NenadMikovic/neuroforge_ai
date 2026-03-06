@@ -25,11 +25,6 @@ interface DashboardData {
     errorRate: number;
     successRate: number;
   };
-  systemInfo: {
-    uptime: number;
-    memoryUsage: number;
-    cpuUsage: number;
-  };
 }
 
 export default function AdminDashboard() {
@@ -37,75 +32,70 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
+  const loadData = async () => {
+    try {
+      let health = null;
+      let metrics = null;
+
+      // Fetch health separately (should always work)
       try {
-        let health = null;
-        let metrics = null;
-
-        // Fetch health separately (should always work)
-        try {
-          const healthRes = await fetch("/api/health");
-          if (healthRes.ok) {
-            health = await healthRes.json();
-          }
-        } catch (e) {
-          console.warn("Health check failed:", e);
+        const healthRes = await fetch("/api/health");
+        if (healthRes.ok) {
+          health = await healthRes.json();
         }
-
-        // Fetch metrics separately (may fail if no data)
-        try {
-          const metricsRes = await fetch("/api/evaluation/metrics?days=1", {
-            headers: { Authorization: "Bearer admin" },
-          });
-          if (metricsRes.ok) {
-            const metricsData = await metricsRes.json();
-            metrics = metricsData.data?.metrics;
-          }
-        } catch (e) {
-          console.warn("Metrics fetch failed:", e);
-        }
-
-        // Use fallback health if needed
-        if (!health) {
-          health = {
-            status: "degraded",
-            timestamp: new Date().toISOString(),
-            checks: {
-              llm: { primary: false, fallback: false, latency: 0 },
-              database: false,
-              config: { loaded: false, llmConfigured: false },
-            },
-          };
-        }
-
-        // Use fallback metrics if needed
-        if (!metrics) {
-          metrics = {
-            totalRequests: 0,
-            totalTokens: 0,
-            averageLatency: 0,
-            errorRate: 0,
-            successRate: 0,
-          };
-        }
-
-        setData({
-          healthStatus: health,
-          metrics: metrics,
-          systemInfo: {
-            uptime: Date.now(),
-            memoryUsage: 45,
-            cpuUsage: 32,
-          },
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+      } catch (e) {
+        console.warn("Health check failed:", e);
       }
-    };
 
+      // Fetch metrics separately (may fail if no data)
+      try {
+        const metricsRes = await fetch("/api/evaluation/metrics?days=1", {
+          headers: { Authorization: "Bearer admin" },
+        });
+        if (metricsRes.ok) {
+          const metricsData = await metricsRes.json();
+          metrics = metricsData.data?.metrics;
+        }
+      } catch (e) {
+        console.warn("Metrics fetch failed:", e);
+      }
+
+      // Use fallback health if needed
+      if (!health) {
+        health = {
+          status: "degraded",
+          timestamp: new Date().toISOString(),
+          checks: {
+            llm: { primary: false, fallback: false, latency: 0 },
+            database: false,
+            config: { loaded: false, llmConfigured: false },
+          },
+        };
+      }
+
+      // Use fallback metrics if needed
+      if (!metrics) {
+        metrics = {
+          totalRequests: 0,
+          totalTokens: 0,
+          averageLatency: 0,
+          errorRate: 0,
+          successRate: 0,
+        };
+      }
+
+      setData({
+        healthStatus: health,
+        metrics: metrics,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
@@ -159,7 +149,27 @@ export default function AdminDashboard() {
             <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
             <p className="text-gray-400">System health & enterprise metrics</p>
           </div>
-          <div className="text-right">
+          <div className="text-right flex items-center gap-3">
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
+            >
+              <svg
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Refresh
+            </button>
             <p
               className={`text-sm font-semibold px-4 py-2 rounded-lg border ${healthColor}`}
             >

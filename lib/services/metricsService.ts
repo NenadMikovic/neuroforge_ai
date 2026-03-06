@@ -11,6 +11,7 @@ export interface AggregatedMetrics {
   averageLatency: number;
   averageTokensPerRequest: number;
   errorRate: number;
+  successRate: number;
   retrievalHitRate: number;
   agentRoutingDistribution: Record<string, number>;
   toolUsageFrequency: Record<string, number>;
@@ -135,6 +136,7 @@ export class MetricsService {
     const errors = metrics.filter((m) => m.errorOccurred).length;
     const errorRate =
       totalRequests > 0 ? Math.round((errors / totalRequests) * 100) : 0;
+    const successRate = totalRequests > 0 ? 100 - errorRate : 0;
 
     // Retrieval hit rate
     const retrievalHits = metrics.filter((m) => m.retrievalHit).length;
@@ -181,6 +183,7 @@ export class MetricsService {
       averageLatency,
       averageTokensPerRequest,
       errorRate,
+      successRate,
       retrievalHitRate,
       agentRoutingDistribution,
       toolUsageFrequency,
