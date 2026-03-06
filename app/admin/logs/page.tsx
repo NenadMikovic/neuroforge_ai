@@ -30,100 +30,45 @@ interface LogEntry {
 
 export default function SystemLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [allModules, setAllModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [moduleFilter, setModuleFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
-  useEffect(() => {
-    // Mock logs (no real API endpoint in admin context)
-    const mockLogs: LogEntry[] = [
-      {
-        id: "1",
-        timestamp: new Date(Date.now() - 5000).toISOString(),
-        level: "info",
-        module: "LLMService",
-        message: "Generating completion for conversation",
-        context: {
-          conversationId: "conv_123",
-          operation: "generateCompletion",
-          duration: 2156,
-        },
-      },
-      {
-        id: "2",
-        timestamp: new Date(Date.now() - 15000).toISOString(),
-        level: "warn",
-        module: "LLMService",
-        message: "Primary model failed, attempting fallback",
-        error: {
-          category: "LLM_UNAVAILABLE",
-          severity: "warning",
-          originalMessage: "ECONNREFUSED: Connection refused",
-        },
-        context: {
-          conversationId: "conv_123",
-          operation: "generateCompletion",
-        },
-      },
-      {
-        id: "3",
-        timestamp: new Date(Date.now() - 25000).toISOString(),
-        level: "info",
-        module: "SecurityService",
-        message: "Input validated successfully",
-        context: {
-          userId: "user_456",
-          operation: "validateInput",
-          duration: 12,
-        },
-      },
-      {
-        id: "4",
-        timestamp: new Date(Date.now() - 45000).toISOString(),
-        level: "error",
-        module: "DatabaseService",
-        message: "Failed to save conversation to database",
-        error: {
-          category: "DATABASE_ERROR",
-          severity: "error",
-          originalMessage: "Unique constraint violation on userId, timestamp",
-        },
-        context: {
-          userId: "user_789",
-          operation: "saveConversation",
-        },
-      },
-      {
-        id: "5",
-        timestamp: new Date(Date.now() - 65000).toISOString(),
-        level: "info",
-        module: "MetricsService",
-        message: "Metrics recorded",
-        context: {
-          operation: "recordMetrics",
-          duration: 8,
-        },
-      },
-      {
-        id: "6",
-        timestamp: new Date(Date.now() - 85000).toISOString(),
-        level: "debug",
-        module: "ConfigManager",
-        message: "Configuration loaded from environment",
-        context: {
-          operation: "loadConfig",
-        },
-      },
-    ];
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    setLogs(mockLogs);
-    setLoading(false);
+      const response = await fetch("/api/admin/logs?limit=200");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch system logs");
+      }
+
+      const data = await response.json();
+
+      setLogs(data.logs || []);
+      setAllModules(data.modules || []);
+    } catch (err) {
+      console.error("Error fetching logs:", err);
+      setError(err instanceof Error ? err.message : "Failed to load logs");
+      setLogs([]);
+      setAllModules([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
   }, []);
 
   const levels = ["all", "debug", "info", "warn", "error", "fatal"];
-  const modules = ["all", ...new Set(logs.map((l) => l.module))];
+  const modules = ["all", ...allModules];
 
   const filteredLogs = logs.filter((log) => {
     const matchLevel = levelFilter === "all" || log.level === levelFilter;
@@ -156,9 +101,31 @@ export default function SystemLogs() {
           >
             ← Back to Dashboard
           </Link>
-          <h1 className="text-4xl font-bold mb-2">System Logs</h1>
-          <p className="text-gray-400">Structured logs and error tracking</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">System Logs</h1>
+              <p className="text-gray-400">
+                Structured logs and error tracking
+              </p>
+            </div>
+            <button
+              onClick={fetchLogs}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
+            >
+              <span className={loading ? "animate-spin" : ""}>↻</span>
+              Refresh
+            </button>
+          </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-300 rounded-lg p-4 mb-6">
+            <p className="font-semibold">Error loading logs</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Search & Filters */}
         <div className="mb-6 space-y-4">
@@ -209,8 +176,13 @@ export default function SystemLogs() {
             <p className="text-gray-400">Loading system logs...</p>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>No logs match your filters</p>
+          <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-12 text-center">
+            <p className="text-gray-400 text-lg mb-2">No logs found</p>
+            <p className="text-gray-500 text-sm">
+              {logs.length === 0
+                ? "No system logs available yet. Logs will appear as the system is used."
+                : "No logs match your current filters. Try adjusting the filters above."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

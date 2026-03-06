@@ -42,9 +42,22 @@ export class MetricsService {
           },
         })) || [];
 
-      // toolExecutionLog and agentLog tables don't exist yet, use empty arrays
-      const toolLogs: any[] = [];
-      const agentLogs: any[] = [];
+      // Fetch tool execution logs
+      const toolLogs =
+        (await (prisma as any).toolExecutionLog?.findMany({
+          where: {
+            userId,
+            createdAt: { gte: startDate },
+          },
+        })) || [];
+
+      // Fetch agent logs
+      const agentLogs =
+        (await (prisma as any).agentLog?.findMany({
+          where: {
+            createdAt: { gte: startDate },
+          },
+        })) || [];
 
       return this.aggregateMetrics(metrics, toolLogs, agentLogs, startDate);
     } catch (error) {
@@ -68,9 +81,21 @@ export class MetricsService {
           },
         })) || [];
 
-      // toolExecutionLog and agentLog tables don't exist yet, use empty arrays
-      const toolLogs: any[] = [];
-      const agentLogs: any[] = [];
+      // Fetch tool execution logs
+      const toolLogs =
+        (await (prisma as any).toolExecutionLog?.findMany({
+          where: {
+            createdAt: { gte: startDate },
+          },
+        })) || [];
+
+      // Fetch agent logs
+      const agentLogs =
+        (await (prisma as any).agentLog?.findMany({
+          where: {
+            createdAt: { gte: startDate },
+          },
+        })) || [];
 
       return this.aggregateMetrics(metrics, toolLogs, agentLogs, startDate);
     } catch (error) {
@@ -116,20 +141,31 @@ export class MetricsService {
     const retrievalHitRate =
       totalRequests > 0 ? Math.round((retrievalHits / totalRequests) * 100) : 0;
 
-    // Agent routing distribution
+    // Agent routing distribution (from agentLogs)
     const agentRoutingDistribution: Record<string, number> = {};
-    for (const metric of metrics) {
-      if (metric.agentType) {
-        agentRoutingDistribution[metric.agentType] =
-          (agentRoutingDistribution[metric.agentType] || 0) + 1;
+    for (const log of agentLogs) {
+      if (log.agentType) {
+        agentRoutingDistribution[log.agentType] =
+          (agentRoutingDistribution[log.agentType] || 0) + 1;
+      }
+    }
+    // Also include from metrics if agentLogs is empty
+    if (agentLogs.length === 0) {
+      for (const metric of metrics) {
+        if (metric.agentType) {
+          agentRoutingDistribution[metric.agentType] =
+            (agentRoutingDistribution[metric.agentType] || 0) + 1;
+        }
       }
     }
 
     // Tool usage frequency
     const toolUsageFrequency: Record<string, number> = {};
     for (const log of toolLogs) {
-      toolUsageFrequency[log.toolName] =
-        (toolUsageFrequency[log.toolName] || 0) + 1;
+      if (log.toolName) {
+        toolUsageFrequency[log.toolName] =
+          (toolUsageFrequency[log.toolName] || 0) + 1;
+      }
     }
 
     // Model usage distribution
