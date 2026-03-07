@@ -59,7 +59,7 @@ _Comprehensive metrics and analytics for system monitoring_
 
 ### **Frontend**
 
-- **Next.js 14** (App Router, React Server Components)
+- **Next.js 16** (App Router, React Server Components)
 - **TypeScript** (Strict mode)
 - **Tailwind CSS** (Responsive design)
 - **React Hooks** (State management)
@@ -96,7 +96,7 @@ Ensure you have the following installed:
 
 | Program     | Version | Purpose             | Download Link                    |
 | ----------- | ------- | ------------------- | -------------------------------- |
-| **Node.js** | 18.x+   | Runtime environment | [nodejs.org](https://nodejs.org) |
+| **Node.js** | 16.x+   | Runtime environment | [nodejs.org](https://nodejs.org) |
 | **Python**  | 3.8+    | Tool execution      | [python.org](https://python.org) |
 | **Ollama**  | Latest  | Local LLM inference | [ollama.ai](https://ollama.ai)   |
 
@@ -105,7 +105,7 @@ Ensure you have the following installed:
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/neuroforge_ai.git
+   git clone https://github.com/NenadMikovic/neuroforge_ai.git
    cd neuroforge_ai
    ```
 
@@ -280,13 +280,19 @@ npx prisma studio
 
 ## 📝 License
 
-This project is private and proprietary.
+This project is open source and released under the MIT License.
+
+NeuroForge AI is a public showcase project demonstrating the architecture of a local enterprise AI platform including chat, RAG, tool calling, and multi-agent systems.
+
+The code can be freely used, modified, and extended for learning, research, and commercial purposes.
 
 ---
 
 ## 👤 Contact
 
-For inquiries, please reach out via [your contact method].
+For inquiries, collaborations, or technical discussions, please visit:
+
+https://nenadmikovic.com
 
 ---
 
